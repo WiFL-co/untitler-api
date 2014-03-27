@@ -127,7 +127,9 @@ def main():
 
   python_tweets = chain.from_iterable(python_tweets)
   for tweet in python_tweets:
-    print("User: {0} ---- {1}".format(tweet['user']['screen_name'], tweet['text']))
+    urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
+    print("User: {0} ---- {1} ---- {2} ---- {3}".format(tweet['user']['screen_name'], tweet['text'],tweet['user'][
+      'description'],urls))
 
 
     # for tweet in python_tweets['statuses']:
