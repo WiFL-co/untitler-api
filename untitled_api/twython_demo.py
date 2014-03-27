@@ -24,8 +24,16 @@ keywords = textwrap.dedent("""\
 search_query = " OR ".join(k for k in keywords.splitlines())
 
 
+def chunks(l, n):
+  """ Yield successive n-sized chunks from l.
+  """
+  for i in range(0, len(l), n):
+    yield l[i:i + n]
+
+
 def get_tweets():
-  return twitter.search(q=search_query, result_type='mixed', since=current_day, lang="en", include_entities=False)
+  return twitter.search(q=search_query, result_type='mixed', since=current_day, lang="en", include_entities=False,
+                        count=100)
 
 
 def acceptable_tweet(tweet):
@@ -56,6 +64,11 @@ def acceptable_tweet(tweet):
 def acceptable_tweets(tweets):
   ret_val = [tweet for tweet in tweets if acceptable_tweet(tweet)]
   usernames = [tweet['user']['screen_name'] for tweet in ret_val]
+  print(len(usernames))
+
+  chunked_names = (list(chunks(usernames, 10)))
+
+
   acceptable_users = " OR ".join(["from:" + un for un in usernames])
   past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%m-%d")
 
@@ -66,8 +79,6 @@ def acceptable_tweets(tweets):
                            include_entities=False, count=100)
   )
 
-  print(acceptable_users)
-  print(past_week)
   print("recieved %s tweets" % len(recent_user_tweets['statuses']))
 
   name_key = lambda tweet: tweet['user']['screen_name']
