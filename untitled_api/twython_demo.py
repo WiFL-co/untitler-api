@@ -132,7 +132,7 @@ def main():
 
   python_tweets = yield from acceptable_tweets(python_tweets)
 
-  python_tweets = chain.from_iterable(python_tweets)
+  python_tweets = list(chain.from_iterable(python_tweets))
 
   gc = gspread.login(google_username, google_password)
   wks = gc.open_by_url(google_spreadsheet)
@@ -147,20 +147,24 @@ def main():
 
   cols = ['User', 'Tweet', 'Bio', 'Website']
 
-  for i, c in enumerate(cols,start=1):
+  for i, c in enumerate(cols, start=1):
     worksheet.update_cell(1, i, c)
 
-  for i, tweet in enumerate(python_tweets,start=2):
+  sheet_range = "A2:{0}{1}".format(chr(len(cols) - 1 + ord("A")), len(python_tweets) +1)
+  cell_ranges = worksheet.range(sheet_range)
+
+  for i, tweet in enumerate(python_tweets):
     username = tweet['user']['screen_name']
     tweet_text = tweet['text']
     bio = tweet['user']['description']
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
     print("User: {0} ---- {1} ---- {2} ---- {3}".format(username, tweet_text, bio, urls))
-    worksheet.update_cell(i , 1, username)
-    worksheet.update_cell(i , 2, tweet_text)
-    worksheet.update_cell(i , 3, bio)
-    worksheet.update_cell(i , 4, urls)
+    cell_ranges[i * 4 + 0].value = username
+    cell_ranges[i * 4 + 1].value = tweet_text
+    cell_ranges[i * 4 + 2].value = bio
+    cell_ranges[i * 4 + 3].value = urls
 
+  worksheet.update_cells(cell_ranges)
 
 @asyncio.coroutine
 def output():
