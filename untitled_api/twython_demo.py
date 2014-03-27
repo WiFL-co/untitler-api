@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-from itertools import groupby
+from itertools import groupby, chain
 import textwrap
 import threading
 import os
@@ -63,33 +63,43 @@ def acceptable_tweet(tweet):
 @asyncio.coroutine
 def acceptable_tweets(tweets):
   ret_val = [tweet for tweet in tweets if acceptable_tweet(tweet)]
-  usernames = [tweet['user']['screen_name'] for tweet in ret_val]
-  print(len(usernames))
-
-  chunked_names = (list(chunks(usernames, 10)))
-
-
-  acceptable_users = " OR ".join(["from:" + un for un in usernames])
+  usernames = sorted({tweet['user']['screen_name'] for tweet in ret_val})
   past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%m-%d")
 
-  recent_user_tweets = yield from loop.run_in_executor(
-    None,
-    lambda: twitter.search(q=acceptable_users, result_type='recent',
-                           since=past_week, lang="en",
-                           include_entities=False, count=100)
-  )
+  chunked_names = (list(chunks(usernames, 15)))
 
-  print("recieved %s tweets" % len(recent_user_tweets['statuses']))
+  @asyncio.coroutine
+  def each_chunk(chunked_names):
+    acceptable_users = " OR ".join(["from:" + un for un in chunked_names])
 
-  name_key = lambda tweet: tweet['user']['screen_name']
+    recent_user_tweets = yield from loop.run_in_executor(
+      None,
+      lambda: twitter.search(q=acceptable_users, result_type='recent',
+                             since=past_week, lang="en",
+                             include_entities=False, count=100)
+    )
 
-  recent_user_tweets = sorted(recent_user_tweets['statuses'], key=name_key)
+    name_key = lambda tweet: tweet['user']['screen_name']
 
-  user_grouped_tweets = {key: len(list(value)) for key, value in (groupby(recent_user_tweets, name_key))}
-  user_grouped_tweets = {key: value for key, value in user_grouped_tweets.items() if value >= 2}
+    recent_user_tweets = sorted(recent_user_tweets['statuses'], key=name_key)
 
-  ret_val = [tweet for tweet in ret_val if tweet['user']['screen_name'] in user_grouped_tweets]
-  return ret_val
+    user_grouped_tweets = {key: len(list(value)) for key, value in (groupby(recent_user_tweets, name_key))}
+    user_grouped_tweets = {key: value for key, value in user_grouped_tweets.items() if value >= 2}
+
+    new_val = [tweet for tweet in ret_val if tweet['user']['screen_name'] in user_grouped_tweets]
+    return new_val
+
+  sem = asyncio.Semaphore(2)
+
+  new_ret_val = []
+  for ch in chunked_names:
+
+    with (yield from sem):
+      results = yield from each_chunk(ch)
+
+      new_ret_val.append(results)
+
+  return new_ret_val
 
 
 @asyncio.coroutine
@@ -104,6 +114,7 @@ def main():
 
   python_tweets = yield from acceptable_tweets(python_tweets)
 
+  python_tweets = chain.from_iterable(python_tweets)
   for tweet in python_tweets:
     print("User: {0} ---- {1}".format(tweet['user']['screen_name'], tweet['text']))
 
