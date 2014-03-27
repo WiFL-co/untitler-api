@@ -1,13 +1,11 @@
 import asyncio
 import datetime
 from itertools import groupby
-import json
-from operator import attrgetter
 import textwrap
 import threading
 import os
-from dateutil.relativedelta import relativedelta
 
+from dateutil.relativedelta import relativedelta
 from twython import Twython
 
 
