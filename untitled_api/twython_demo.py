@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from functools import partial
 from itertools import groupby, chain
 import textwrap
 import threading
@@ -17,9 +18,7 @@ loop = asyncio.get_event_loop()
 
 current_day = datetime.datetime.utcnow().strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  #firebase
   #atom.io
-  #python
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -60,13 +59,26 @@ def acceptable_tweet(tweet):
   return ret_val
 
 
+past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%m-%d")
+
+
+def user_search(acceptable_users):
+  print("{0}: starting".format(threading.current_thread()))
+  ret_val = twitter.search(q=acceptable_users, result_type='recent',
+                        since=past_week, lang="en",
+                        include_entities=False, count=100)
+  from time import sleep
+  # sleep(5)
+  print("{0}: finishing".format(threading.current_thread()))
+  return ret_val
+
 @asyncio.coroutine
 def acceptable_tweets(tweets):
   ret_val = [tweet for tweet in tweets if acceptable_tweet(tweet)]
   usernames = sorted({tweet['user']['screen_name'] for tweet in ret_val})
-  past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%m-%d")
 
   chunked_names = (list(chunks(usernames, 15)))
+
 
   @asyncio.coroutine
   def each_chunk(chunked_names):
@@ -74,9 +86,7 @@ def acceptable_tweets(tweets):
 
     recent_user_tweets = yield from loop.run_in_executor(
       None,
-      lambda: twitter.search(q=acceptable_users, result_type='recent',
-                             since=past_week, lang="en",
-                             include_entities=False, count=100)
+      partial(user_search, acceptable_users)
     )
 
     name_key = lambda tweet: tweet['user']['screen_name']
@@ -89,11 +99,10 @@ def acceptable_tweets(tweets):
     new_val = [tweet for tweet in ret_val if tweet['user']['screen_name'] in user_grouped_tweets]
     return new_val
 
-  sem = asyncio.Semaphore(2)
+  sem = asyncio.Semaphore(5)
 
   new_ret_val = []
   for ch in chunked_names:
-
     with (yield from sem):
       results = yield from each_chunk(ch)
 
