@@ -31,7 +31,9 @@ def chunks(l, n):
 
 
 def get_tweets():
-  return twitter.search(q=search_query, result_type='mixed', since=current_day, lang="en", include_entities=False,
+  # http://stackoverflow.com/questions/7400656/twitter-search-atom-api-exclude-retweets
+  return twitter.search(q=search_query + " +exclude:retweets", result_type='mixed', since=current_day, lang="en",
+                        include_entities=False,
                         count=100)
 
 
@@ -77,7 +79,7 @@ def acceptable_tweets(tweets):
   ret_val = [tweet for tweet in tweets if acceptable_tweet(tweet)]
   usernames = sorted({tweet['user']['screen_name'] for tweet in ret_val})
 
-  chunked_names = (list(chunks(usernames, 15)))
+  chunked_names = (list(chunks(usernames, 10)))
 
 
   @asyncio.coroutine
