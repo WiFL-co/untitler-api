@@ -63,8 +63,12 @@ def acceptable_tweets(tweets):
     None,
     lambda: twitter.search(q=acceptable_users, result_type='recent',
                            since=past_week, lang="en",
-                           include_entities=False)
+                           include_entities=False, count=100)
   )
+
+  print(acceptable_users)
+  print(past_week)
+  print("recieved %s tweets" % len(recent_user_tweets['statuses']))
 
   name_key = lambda tweet: tweet['user']['screen_name']
 
@@ -84,6 +88,8 @@ def main():
   python_tweets = yield from loop.run_in_executor(None, get_tweets)
 
   python_tweets = python_tweets['statuses']
+
+  print("recieved %s tweets" % len(python_tweets))
 
   python_tweets = yield from acceptable_tweets(python_tweets)
 
