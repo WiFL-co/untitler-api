@@ -7,11 +7,17 @@ import threading
 import os
 
 from dateutil.relativedelta import relativedelta
+import gspread
+
 from twython import Twython
 
 
 app_key = os.environ.get('app_key')
 app_secret = os.environ.get('app_secret')
+
+google_username = os.environ.get('google_username')
+google_password = os.environ.get('google_password')
+google_spreadsheet = os.environ.get('google_spreadsheet')
 
 twitter = Twython(app_key, app_secret)
 loop = asyncio.get_event_loop()
@@ -67,12 +73,13 @@ past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%
 def user_search(acceptable_users):
   print("{0}: starting".format(threading.current_thread()))
   ret_val = twitter.search(q=acceptable_users, result_type='recent',
-                        since=past_week, lang="en",
-                        include_entities=False, count=100)
+                           since=past_week, lang="en",
+                           include_entities=False, count=100)
   from time import sleep
   # sleep(5)
   print("{0}: finishing".format(threading.current_thread()))
   return ret_val
+
 
 @asyncio.coroutine
 def acceptable_tweets(tweets):
@@ -126,14 +133,33 @@ def main():
   python_tweets = yield from acceptable_tweets(python_tweets)
 
   python_tweets = chain.from_iterable(python_tweets)
-  for tweet in python_tweets:
+
+  gc = gspread.login(google_username, google_password)
+  wks = gc.open_by_url(google_spreadsheet)
+  new_worksheet_len = len(wks.worksheets()) + 1
+  new_ws_time = datetime.datetime.now().strftime("%I:%M %p on %B %d, %Y")
+
+  new_worksheet_name = "Sheet{0} {1}: {2}".format(new_worksheet_len, new_ws_time, ", ".join(k for k in
+                                                                                            keywords.splitlines(
+                                                                                            )))[:50]
+
+  worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
+
+  cols = ['User', 'Tweet', 'Bio', 'Website']
+
+  for i, c in enumerate(cols,start=1):
+    worksheet.update_cell(1, i, c)
+
+  for i, tweet in enumerate(python_tweets,start=2):
+    username = tweet['user']['screen_name']
+    tweet_text = tweet['text']
+    bio = tweet['user']['description']
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
-    print("User: {0} ---- {1} ---- {2} ---- {3}".format(tweet['user']['screen_name'], tweet['text'],tweet['user'][
-      'description'],urls))
-
-
-    # for tweet in python_tweets['statuses']:
-    # pprint(tweet)
+    print("User: {0} ---- {1} ---- {2} ---- {3}".format(username, tweet_text, bio, urls))
+    worksheet.update_cell(i , 1, username)
+    worksheet.update_cell(i , 2, tweet_text)
+    worksheet.update_cell(i , 3, bio)
+    worksheet.update_cell(i , 4, urls)
 
 
 @asyncio.coroutine
