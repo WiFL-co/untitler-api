@@ -145,24 +145,27 @@ def main():
 
   worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
 
-  cols = ['User', 'Tweet', 'Bio', 'Website']
+  cols = ['User', 'Tweet Link', 'Tweet', 'Bio', 'Website']
 
   for i, c in enumerate(cols, start=1):
     worksheet.update_cell(1, i, c)
 
-  sheet_range = "A2:{0}{1}".format(chr(len(cols) - 1 + ord("A")), len(python_tweets) +1)
+  col_length = len(cols)
+  sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) +1)
   cell_ranges = worksheet.range(sheet_range)
 
   for i, tweet in enumerate(python_tweets):
     username = tweet['user']['screen_name']
+    tweet_link = "http://twitter.com/{0}/status/{1}".format(username,tweet['id_str'])
     tweet_text = tweet['text']
     bio = tweet['user']['description']
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
     print("User: {0} ---- {1} ---- {2} ---- {3}".format(username, tweet_text, bio, urls))
-    cell_ranges[i * 4 + 0].value = username
-    cell_ranges[i * 4 + 1].value = tweet_text
-    cell_ranges[i * 4 + 2].value = bio
-    cell_ranges[i * 4 + 3].value = urls
+    cell_ranges[i * col_length + 0].value = username
+    cell_ranges[i * col_length + 1].value = tweet_link
+    cell_ranges[i * col_length + 2].value = tweet_text
+    cell_ranges[i * col_length + 3].value = bio
+    cell_ranges[i * col_length + 4].value = urls
 
   worksheet.update_cells(cell_ranges)
 
