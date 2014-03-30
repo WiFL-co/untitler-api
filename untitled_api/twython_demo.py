@@ -99,13 +99,14 @@ def acceptable_tweets(tweets):
 
 
   @asyncio.coroutine
-  def each_chunk(chunked_names):
+  def each_chunk(chunked_names, sem):
     acceptable_users = " OR ".join(["from:" + un for un in chunked_names])
 
-    recent_user_tweets = yield from loop.run_in_executor(
-      None,
-      partial(user_search, acceptable_users)
-    )
+    with (yield from sem):
+      recent_user_tweets = yield from loop.run_in_executor(
+        None,
+        partial(user_search, acceptable_users)
+      )
 
     name_key = lambda tweet: tweet['user']['screen_name']
 
@@ -119,12 +120,9 @@ def acceptable_tweets(tweets):
 
   sem = asyncio.Semaphore(5)
 
-  new_ret_val = []
-  for ch in chunked_names:
-    with (yield from sem):
-      results = yield from each_chunk(ch)
+  chunks_done,pending = yield from asyncio.wait([each_chunk(ch,sem) for ch in chunked_names])
 
-      new_ret_val.append(results)
+  new_ret_val = list(chain.from_iterable(ch.result() for ch in chunks_done))
 
   return new_ret_val
 
@@ -140,8 +138,6 @@ def main():
   print("recieved %s tweets" % len(python_tweets))
 
   python_tweets = yield from acceptable_tweets(python_tweets)
-
-  python_tweets = list(chain.from_iterable(python_tweets))
 
   gc = gspread.login(google_username, google_password)
   wks = gc.open_by_url(google_spreadsheet)
