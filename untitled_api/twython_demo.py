@@ -24,7 +24,11 @@ loop = asyncio.get_event_loop()
 
 current_day = datetime.datetime.utcnow().strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  #atom.io
+  #hackernews
+  #usability
+  #pycharm
+  #userexperience
+  @msuster
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -38,13 +42,18 @@ def chunks(l, n):
 
 def get_tweets():
   # http://stackoverflow.com/questions/7400656/twitter-search-atom-api-exclude-retweets
-  return twitter.search(q=search_query + " +exclude:retweets", result_type='mixed', since=current_day, lang="en",
+  return twitter.search(q=search_query + ' +exclude:retweets -"rt" -"mt"', result_type='mixed', since=current_day,
+                        lang="en",
                         include_entities=False,
                         count=100)
 
 
 def acceptable_tweet(tweet):
   ret_val = True
+
+  if ret_val:
+    if tweet['in_reply_to_user_id']:
+      ret_val = False
 
   if ret_val:
     if tweet['retweet_count'] >= 20 or tweet['favorite_count'] >= 20:
@@ -58,7 +67,7 @@ def acceptable_tweet(tweet):
     followers_count = tweet['user']['followers_count']
     following_count = tweet['user']['friends_count']
 
-    if following_count >= 10:
+    if following_count >= 30 and followers_count >= 30:
       if followers_count > 500:
         ret_val = (following_count / followers_count) >= .65
     else:
@@ -72,7 +81,7 @@ past_week = (datetime.datetime.utcnow() - relativedelta(weeks=1)).strftime("%Y-%
 
 def user_search(acceptable_users):
   print("{0}: starting".format(threading.current_thread()))
-  ret_val = twitter.search(q=acceptable_users, result_type='recent',
+  ret_val = twitter.search(q=acceptable_users + ' +exclude:retweets -"rt" -"mt"', result_type='recent',
                            since=past_week, lang="en",
                            include_entities=False, count=100)
   from time import sleep
@@ -145,7 +154,7 @@ def main():
 
   worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
 
-  cols = ['User', 'Tweet Link', 'Tweet', 'Bio', 'Website']
+  cols = ['User', 'Tweet Link', 'Tweet', 'Bio', 'Followers', 'Following', 'Website']
 
   for i, c in enumerate(cols, start=1):
     worksheet.update_cell(1, i, c)
@@ -156,6 +165,8 @@ def main():
 
   for i, tweet in enumerate(python_tweets):
     username = tweet['user']['screen_name']
+    followers_count = tweet['user']['followers_count']
+    following_count = tweet['user']['friends_count']
     tweet_link = "http://twitter.com/{0}/status/{1}".format(username,tweet['id_str'])
     tweet_text = tweet['text']
     bio = tweet['user']['description']
@@ -165,7 +176,9 @@ def main():
     cell_ranges[i * col_length + 1].value = tweet_link
     cell_ranges[i * col_length + 2].value = tweet_text
     cell_ranges[i * col_length + 3].value = bio
-    cell_ranges[i * col_length + 4].value = urls
+    cell_ranges[i * col_length + 4].value = followers_count
+    cell_ranges[i * col_length + 5].value = following_count
+    cell_ranges[i * col_length + 6].value = urls
 
   worksheet.update_cells(cell_ranges)
 
