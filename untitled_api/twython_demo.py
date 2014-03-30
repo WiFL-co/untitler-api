@@ -1,7 +1,9 @@
+import aiohttp
 import asyncio
 import datetime
 from functools import partial
 from itertools import groupby, chain
+import json
 import textwrap
 import threading
 import os
@@ -118,11 +120,33 @@ def acceptable_tweets(tweets):
     new_val = [tweet for tweet in ret_val if tweet['user']['screen_name'] in user_grouped_tweets]
     return new_val
 
+  alchemy_url = 'http://access.alchemyapi.com/calls/text/TextGetRankedNamedEntities'
+  alchemy_key = os.environ.get('alchemy_key')
+
+  @asyncio.coroutine
+  def is_proper_entity(person, sem):
+    with (yield from sem):
+      params = {"outputMode": "json", "apikey": alchemy_key, "text": person['user']['name']}
+      alchemy_response = yield from aiohttp.request('GET', alchemy_url, params=params)
+      result = yield from alchemy_response.read_and_close(decode=True)
+
+    try:
+      if result['entities'][0]['type'].lower() == 'person':
+        return person
+      else:
+        return None
+    except:
+      return None
+
   sem = asyncio.Semaphore(5)
 
-  chunks_done,pending = yield from asyncio.wait([each_chunk(ch,sem) for ch in chunked_names])
+  chunks_done, pending = yield from asyncio.wait([each_chunk(ch, sem) for ch in chunked_names])
 
   new_ret_val = list(chain.from_iterable(ch.result() for ch in chunks_done))
+
+  people_done, pending = yield from asyncio.wait([is_proper_entity(ch, sem) for ch in new_ret_val])
+
+  new_ret_val = list(filter(None, map(lambda p: p.result(), people_done)))
 
   return new_ret_val
 
@@ -156,14 +180,14 @@ def main():
     worksheet.update_cell(1, i, c)
 
   col_length = len(cols)
-  sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) +1)
+  sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) + 1)
   cell_ranges = worksheet.range(sheet_range)
 
   for i, tweet in enumerate(python_tweets):
     username = tweet['user']['screen_name']
     followers_count = tweet['user']['followers_count']
     following_count = tweet['user']['friends_count']
-    tweet_link = "http://twitter.com/{0}/status/{1}".format(username,tweet['id_str'])
+    tweet_link = "http://twitter.com/{0}/status/{1}".format(username, tweet['id_str'])
     tweet_text = tweet['text']
     bio = tweet['user']['description']
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
@@ -177,6 +201,7 @@ def main():
     cell_ranges[i * col_length + 6].value = urls
 
   worksheet.update_cells(cell_ranges)
+
 
 @asyncio.coroutine
 def output():
