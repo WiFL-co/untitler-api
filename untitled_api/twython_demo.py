@@ -24,13 +24,10 @@ google_spreadsheet = os.environ.get('google_spreadsheet')
 twitter = Twython(app_key, app_secret)
 loop = asyncio.get_event_loop()
 
-current_day = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  #hackernews
-  #usability
-  #pycharm
-  #userexperience
-  @msuster
+  #firebase
+  #leanstackio
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -44,7 +41,7 @@ def chunks(l, n):
 
 def get_tweets():
   # http://stackoverflow.com/questions/7400656/twitter-search-atom-api-exclude-retweets
-  return twitter.search(q=search_query + ' +exclude:retweets -"rt" -"mt"', result_type='mixed', since=current_day,
+  return twitter.search(q=search_query + ' +exclude:retweets -"rt" -"mt"', result_type='recent', since=current_day,
                         lang="en",
                         include_entities=False,
                         count=100)
