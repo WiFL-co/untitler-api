@@ -184,7 +184,7 @@ def main():
   cell_ranges = worksheet.range(sheet_range)
 
   for i, tweet in enumerate(python_tweets):
-    username = tweet['user']['screen_name']
+    username = "https://twitter.com/{0}".format(tweet['user']['screen_name'])
     followers_count = tweet['user']['followers_count']
     following_count = tweet['user']['friends_count']
     tweet_link = "http://twitter.com/{0}/status/{1}".format(username, tweet['id_str'])
