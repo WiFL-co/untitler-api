@@ -26,8 +26,9 @@ loop = asyncio.get_event_loop()
 
 current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  #firebase
-  #leanstackio
+  firebase
+  leanstackio
+  asana -yoga
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -173,8 +174,12 @@ def main():
 
   cols = ['User', 'Tweet Link', 'Tweet', 'Bio', 'Followers', 'Following', 'Website']
 
+  i = 0
   for i, c in enumerate(cols, start=1):
     worksheet.update_cell(1, i, c)
+
+  worksheet.update_cell(1, i+ 1, "Notes")
+
 
   col_length = len(cols)
   sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) + 1)
@@ -184,7 +189,7 @@ def main():
     username = "https://twitter.com/{0}".format(tweet['user']['screen_name'])
     followers_count = tweet['user']['followers_count']
     following_count = tweet['user']['friends_count']
-    tweet_link = "http://twitter.com/{0}/status/{1}".format(username, tweet['id_str'])
+    tweet_link = "{0}/status/{1}".format(username, tweet['id_str'])
     tweet_text = tweet['text']
     bio = tweet['user']['description']
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
