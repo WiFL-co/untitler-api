@@ -26,9 +26,10 @@ loop = asyncio.get_event_loop()
 
 current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  firebase
-  leanstackio
-  asana -yoga
+  cdixon
+  jasonfreedman‎
+  joelgascoigne‎
+  edsim
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -179,6 +180,7 @@ def main():
     worksheet.update_cell(1, i, c)
 
   worksheet.update_cell(1, i+ 1, "Notes")
+  worksheet.update_cell(1, i+ 2, ", ".join(k for k in keywords.splitlines()))
 
 
   col_length = len(cols)
