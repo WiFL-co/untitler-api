@@ -26,10 +26,10 @@ loop = asyncio.get_event_loop()
 
 current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  cdixon
-  jasonfreedman‎
-  joelgascoigne‎
-  edsim
+  @Algolia
+  @slackhq
+  @datadoghq
+  @mysliderule
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -173,7 +173,9 @@ def main():
 
   worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
 
-  cols = ['User', 'Tweet Link', 'Tweet', 'Bio', 'Followers', 'Following', 'Website']
+  cols = ['Profile','Name', 'Action they recently took', 'Suggested ideas for engagement', "Why they're in target audience", 'Followers',
+          'Following',
+          'Website']
 
   i = 0
   for i, c in enumerate(cols, start=1):
@@ -189,6 +191,7 @@ def main():
 
   for i, tweet in enumerate(python_tweets):
     username = "https://twitter.com/{0}".format(tweet['user']['screen_name'])
+    human_name = tweet['user']['name']
     followers_count = tweet['user']['followers_count']
     following_count = tweet['user']['friends_count']
     tweet_link = "{0}/status/{1}".format(username, tweet['id_str'])
@@ -197,12 +200,13 @@ def main():
     urls = tweet['user']['entities']['url']['urls'][0]['expanded_url'] if 'url' in tweet['user']['entities'] else None
     print("User: {0} ---- {1} ---- {2} ---- {3}".format(username, tweet_text, bio, urls))
     cell_ranges[i * col_length + 0].value = username
-    cell_ranges[i * col_length + 1].value = tweet_link
-    cell_ranges[i * col_length + 2].value = tweet_text
-    cell_ranges[i * col_length + 3].value = bio
-    cell_ranges[i * col_length + 4].value = followers_count
-    cell_ranges[i * col_length + 5].value = following_count
-    cell_ranges[i * col_length + 6].value = urls
+    cell_ranges[i * col_length + 1].value = human_name
+    cell_ranges[i * col_length + 2].value = tweet_link
+    cell_ranges[i * col_length + 3].value = tweet_text
+    cell_ranges[i * col_length + 4].value = bio
+    cell_ranges[i * col_length + 5].value = followers_count
+    cell_ranges[i * col_length + 6].value = following_count
+    cell_ranges[i * col_length + 7].value = urls
 
   worksheet.update_cells(cell_ranges)
 
