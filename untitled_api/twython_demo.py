@@ -222,9 +222,7 @@ def main():
   new_worksheet_len = len(wks.worksheets()) + 1
   new_ws_time = datetime.datetime.now().strftime("%I:%M %p on %B %d, %Y")
 
-  new_worksheet_name = "Sheet{0} {1}: {2}".format(new_worksheet_len, new_ws_time, ", ".join(k for k in
-                                                                                            keywords.splitlines(
-                                                                                            )))[:50]
+  new_worksheet_name = "Sheet{0} {1}: {2}".format(new_worksheet_len, new_ws_time, ", ".join(keywords_to_use))[:50]
 
   worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
 
@@ -238,7 +236,7 @@ def main():
     worksheet.update_cell(1, i, c)
 
   worksheet.update_cell(1, i + 1, "Notes")
-  worksheet.update_cell(1, i + 2, keywords_to_use_str)
+  worksheet.update_cell(1, i + 2, ", ".join(keywords_to_use))
 
   col_length = len(cols)
   sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) + 1)
