@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 import gspread
 
 from twython import Twython
+from untitled_api.libs.text_utils.parsers.text_parser import get_canonical_name_from_keywords
 
 
 app_key = os.environ.get('app_key')
@@ -20,16 +21,18 @@ app_secret = os.environ.get('app_secret')
 google_username = os.environ.get('google_username')
 google_password = os.environ.get('google_password')
 google_spreadsheet = os.environ.get('google_spreadsheet')
+persona_spreadsheet = os.environ.get('persona_spreadsheet')
 
 twitter = Twython(app_key, app_secret)
+
+sem = asyncio.Semaphore(5)
 loop = asyncio.get_event_loop()
 
 current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  @Algolia
-  @slackhq
   @datadoghq
   @mysliderule
+  @marvelapp
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -41,9 +44,16 @@ def chunks(l, n):
     yield l[i:i + n]
 
 
-def get_tweets():
+def get_tweets(query):
   # http://stackoverflow.com/questions/7400656/twitter-search-atom-api-exclude-retweets
-  return twitter.search(q=search_query + ' +exclude:retweets -"rt" -"mt"', result_type='recent', since=current_day,
+  return twitter.search(q=query + ' +exclude:retweets -"rt" -"mt"', result_type='recent', since=current_day,
+                        lang="en",
+                        include_entities=False,
+                        count=100)
+
+
+def get_trending_keywords_from_tweets(source_handle):
+  return twitter.search(q="from:" + source_handle, result_type='mixed', since=current_day,
                         lang="en",
                         include_entities=False,
                         count=100)
@@ -137,7 +147,6 @@ def acceptable_tweets(tweets):
     except:
       return None
 
-  sem = asyncio.Semaphore(5)
 
   chunks_done, pending = yield from asyncio.wait([each_chunk(ch, sem) for ch in chunked_names])
 
@@ -150,11 +159,58 @@ def acceptable_tweets(tweets):
   return new_ret_val
 
 
+def get_persona_keywords(persona_wks):
+  client_persona = persona_wks.get_worksheet(0).col_values(1)
+  ta_persona = persona_wks.get_worksheet(0).col_values(2)
+
+  del client_persona[0], ta_persona[0]
+  return {p: p for p in set(client_persona + ta_persona)}
+
+
+def get_keywords_to_use(persona_keywords, tweets):
+  ret_val = []
+
+  for tweet in tweets:
+    found_keywords = get_canonical_name_from_keywords(tweet['text'], persona_keywords)
+    for fk in found_keywords:
+      ret_val.append(fk.keyword_id)
+
+  return list(set(ret_val))
+
+
+def get_keyword_sources(persona_wks):
+  keyword_sources = persona_wks.get_worksheet(0).col_values(3)
+
+  del keyword_sources[0]
+  return keyword_sources
+
+
 @asyncio.coroutine
 def main():
   print('starting')
 
-  python_tweets = yield from loop.run_in_executor(None, get_tweets)
+  gc = gspread.login(google_username, google_password)
+
+  persona_wks = gc.open_by_url(persona_spreadsheet)
+
+  persona_keywords = get_persona_keywords(persona_wks)
+
+  keyword_sources = get_keyword_sources(persona_wks)
+
+  keyword_tweets, pending = (
+    yield from
+    asyncio.wait([
+      loop.run_in_executor(None, partial(get_trending_keywords_from_tweets, ks)) for ks in keyword_sources
+    ])
+  )
+
+  keyword_tweets = list(chain.from_iterable(ch.result()['statuses'] for ch in keyword_tweets))
+
+  keywords_to_use = get_keywords_to_use(persona_keywords, keyword_tweets)
+
+  keywords_to_use_str = " OR ".join(keywords_to_use)
+
+  python_tweets = yield from loop.run_in_executor(None, partial(get_tweets, keywords_to_use_str))
 
   python_tweets = python_tweets['statuses']
 
@@ -162,7 +218,6 @@ def main():
 
   python_tweets = yield from acceptable_tweets(python_tweets)
 
-  gc = gspread.login(google_username, google_password)
   wks = gc.open_by_url(google_spreadsheet)
   new_worksheet_len = len(wks.worksheets()) + 1
   new_ws_time = datetime.datetime.now().strftime("%I:%M %p on %B %d, %Y")
@@ -173,7 +228,8 @@ def main():
 
   worksheet = wks.add_worksheet(title=new_worksheet_name, rows="100", cols="20")
 
-  cols = ['Profile','Name', 'Action they recently took', 'Suggested ideas for engagement', "Why they're in target audience", 'Followers',
+  cols = ['Profile', 'Name', 'Action they recently took', 'Suggested ideas for engagement',
+          "Why they're in target audience", 'Followers',
           'Following',
           'Website']
 
@@ -181,9 +237,8 @@ def main():
   for i, c in enumerate(cols, start=1):
     worksheet.update_cell(1, i, c)
 
-  worksheet.update_cell(1, i+ 1, "Notes")
-  worksheet.update_cell(1, i+ 2, ", ".join(k for k in keywords.splitlines()))
-
+  worksheet.update_cell(1, i + 1, "Notes")
+  worksheet.update_cell(1, i + 2, ", ".join(k for k in keywords.splitlines()))
 
   col_length = len(cols)
   sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) + 1)
