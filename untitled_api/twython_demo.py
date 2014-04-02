@@ -238,7 +238,7 @@ def main():
     worksheet.update_cell(1, i, c)
 
   worksheet.update_cell(1, i + 1, "Notes")
-  worksheet.update_cell(1, i + 2, ", ".join(k for k in keywords.splitlines()))
+  worksheet.update_cell(1, i + 2, keywords_to_use_str)
 
   col_length = len(cols)
   sheet_range = "A2:{0}{1}".format(chr(col_length - 1 + ord("A")), len(python_tweets) + 1)
