@@ -30,9 +30,9 @@ loop = asyncio.get_event_loop()
 
 current_day = (datetime.datetime.utcnow() - relativedelta(days=1)).strftime("%Y-%m-%d")
 keywords = textwrap.dedent("""\
-  @datadoghq
-  @mysliderule
-  @marvelapp
+  postgres
+  mongodb
+  back-end
 """)
 search_query = " OR ".join(k for k in keywords.splitlines())
 
@@ -191,24 +191,29 @@ def main():
 
   gc = gspread.login(google_username, google_password)
 
-  persona_wks = gc.open_by_url(persona_spreadsheet)
+  if search_query:
+    keywords_to_use = keywords.splitlines()
+    keywords_to_use_str = search_query
+  else:
 
-  persona_keywords = get_persona_keywords(persona_wks)
+    persona_wks = gc.open_by_url(persona_spreadsheet)
 
-  keyword_sources = get_keyword_sources(persona_wks)
+    persona_keywords = get_persona_keywords(persona_wks)
 
-  keyword_tweets, pending = (
-    yield from
-    asyncio.wait([
-      loop.run_in_executor(None, partial(get_trending_keywords_from_tweets, ks)) for ks in keyword_sources
-    ])
-  )
+    keyword_sources = get_keyword_sources(persona_wks)
 
-  keyword_tweets = list(chain.from_iterable(ch.result()['statuses'] for ch in keyword_tweets))
+    keyword_tweets, pending = (
+      yield from
+      asyncio.wait([
+        loop.run_in_executor(None, partial(get_trending_keywords_from_tweets, ks)) for ks in keyword_sources
+      ])
+    )
 
-  keywords_to_use = get_keywords_to_use(persona_keywords, keyword_tweets)
+    keyword_tweets = list(chain.from_iterable(ch.result()['statuses'] for ch in keyword_tweets))
 
-  keywords_to_use_str = " OR ".join(keywords_to_use)
+    keywords_to_use = get_keywords_to_use(persona_keywords, keyword_tweets)
+
+    keywords_to_use_str = " OR ".join(keywords_to_use)
 
   python_tweets = yield from loop.run_in_executor(None, partial(get_tweets, keywords_to_use_str))
 
